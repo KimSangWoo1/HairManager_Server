@@ -1,0 +1,289 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="EUC-KR" import="Calendar.*, java.util.*"%>
+<%@ page import="org.json.simple.*" %>
+<%@ page import="java.io.*" %>
+<%@ page import="java.text.SimpleDateFormat" %>
+<%@page import="com.oreilly.servlet.multipart.DefaultFileRenamePolicy"%>
+<%@page import="com.oreilly.servlet.MultipartRequest"%>
+<%@ page import="Common.*" %>
+
+<%
+	request.setCharacterEncoding("UTF-8");
+
+	if(request.getMethod().equals("POST")){		
+		// 오류 있을 시 체크하기 위한 bool변수
+		boolean diaryUpdate = false;  //일기 DB저장
+		boolean notifyUpdate = false;  //알림 DB저장
+		boolean photoUpdate = false;  //파일 DB저장
+		boolean photoFileCreate =false; //파일 생성 
+		//boolean photoFileMovedError =false;  //파일 이동
+		
+		//DB 접근할 Data Object
+		WriteDiaryDAO dao = new WriteDiaryDAO();
+		DiaryDTO dto = new DiaryDTO();
+		DiaryDTO backupDTO = new DiaryDTO(); //백업할 DTO
+		List<File> files = new ArrayList<>(); //사진 파일들
+		MultipartRequest multiBackup= null;
+		
+		try{
+		System.out.println("Write Diary POST!!");
+	
+		System.out.println("서버 : " + request.getServerName());
+		System.out.println("포트번호 : " + request.getServerPort());
+		System.out.println("요청방식 : " + request.getMethod());
+		System.out.println("프로토콜 : " + request.getProtocol());
+		System.out.println("URL : " + request.getRequestURL());
+		System.out.println("URI : " + request.getRequestURI());
+			
+		//앱에서 서버로 이미지 전송시 임시 저장소 폴더
+		String uploadPath = request.getRealPath("upload"); 
+		//서버에서 실질적으로 저장될 이미지 데이터가 있는 폴더
+		String imageDataPath = request.getRealPath("hm_image_data"); 
+		//실제 이미지 저장소 경로 생성이 되어있는지 확인 - 없으면 생성
+		FileManager.FileCheck(imageDataPath);
+		
+		// MultipartRequest 인스턴스 생성(cos.jar의 라이브러리)
+		MultipartRequest multi = new MultipartRequest( 
+				request, 
+				uploadPath, // 파일을 저장할 디렉토리 지정
+				100 * 1024*1024, // 첨부파일 최대 용량 설정(bite) / 100MB / 용량 초과 시 예외 발생
+				"utf-8", // 인코딩 방식 지정
+				new DefaultFileRenamePolicy() // 중복 파일 처리(동일한 파일명이 업로드되면 뒤에 숫자 등을 붙여 중복 회피)
+		);
+		
+		//오류 있을 시 multiBackup 사용
+		multiBackup=multi;		
+		photoFileCreate = true; //사진 저장 완료
+		//****************************사진저장이 완료 **********************************
+		
+		//파라메터 받기
+		String json = multi.getParameter("json");
+		if(json==null){
+			String result = API_ResponseCode.API_SY_0002();
+			System.out.println("Get PARAMETER 오류 NULL!!");
+			out.println(result); 
+		}else{
+			
+		
+			System.out.println(json);				
+			//전달받은 데이터 파싱하여 dto에 넣기
+			dto = JDataParser.Request_Calendar_004(json);
+			
+			//백업 준비
+			DetailDiaryDAO backupDAO = new DetailDiaryDAO();
+			backupDTO =  backupDAO.DetailDiary(dto.getUserNO(),dto.getDiaryID() , dto.getDiaryDate());
+			
+			int count = dao.CheckWirteOverDiary(dto);//해당 날짜 기록 갯수 받아오기
+			int totalDiary = dao.TotalDiary(dto); //일기 총 갯수 받아오기
+			int totalNotify = dao.TotalNotify(dto); //알림 총 갯수 받아오기
+			boolean dateIndiary = dao.DateInDiary(dto); //같은 날짜 일기인지 체크
+			boolean titleOverSize = DataCheck.checkTitle(dto); //제목 길이 초과 인지 체크
+			boolean contentOverSize = DataCheck.checkContent(dto); //내용 길이 초과 인지 체크
+				
+			 //1. 일기 수정 제목 길이 초과 API 응답코드
+			if(titleOverSize){
+		    	out.println(API_ResponseCode.API_CA_0001());
+		    	System.out.println("제목 길이 초과 : "+totalDiary);
+			}
+			 //2. 일기 수정 제목 길이 초과 API 응답코드
+			else if(contentOverSize){
+		    	out.println(API_ResponseCode.API_CA_0002());
+		    	System.out.println("내용 길이 초과 : "+totalDiary);
+		    }
+			 //3.다른 날짜에서 작성된 일기가  이미 3개가 있는 날짜로 수정할 경우 일기 작성 취소 API 응답코드
+			else if(count>=3 && !dateIndiary){ 
+		    	out.println(API_ResponseCode.API_CA_0003());
+		    	System.out.println("하루 일기 갯수 초과: "+count);
+		    }    
+			//4. 전체 알림 저장 갯수가 100개를 넘었을 경우 API 응답코드
+			else if(totalNotify >=100 ){
+			    	if(dto.isNotifyCheck()){
+			    		out.println(API_ResponseCode.API_CA_0006());
+		    			System.out.println("전체 알림 저장 갯수 초과: "+totalNotify);
+					}
+		    }
+		    //실패 요건이 없을 경우
+		    else{
+		    	//일기 수정하기
+		    	dto = dao.UpdateDiaryDB(dto); 		
+		    	//알림 수정사항 체크하기
+		    	if(dto.isError()){
+	    		   String result = API_ResponseCode.API_DB_0303();
+				   out.println(result);
+		    	}else{
+		    		diaryUpdate= true; //다이어리 작성 완료
+		    		if(dto.getNotifyID()!=0){
+			    		//1.알림이 변경 되었거나(Update) 
+			    		if(dto.isNotifyCheck()){
+			    			dto = dao.UpdateNotifyDiary(dto);  	
+			    		}					    		
+			    	}else{
+			    		//2.알림이 새로 생겼을 경우가 있다.(INSERT)
+			    		if(dto.isNotifyCheck()){
+			    			dto = dao.WriteNotifyDB(dto);  	
+			    		}
+			    		// 3.알림이 있었다가 없을 경우(만약 데이터가 있으면 데이터 삭제)
+			    		else{
+			    			dto = dao.UpdateDeleteNotiy(dto); 
+			    		}
+			    	} 	
+		    		//알림 DB 왔다 갔으니까 한번 더 검사 
+		    	   	if(dto.isError()){
+		    		   String result = API_ResponseCode.API_DB_0303();
+					   out.println(result);
+		    		}else{
+		    			notifyUpdate = true;  //알림 저장 완료	
+		    			System.out.println("여기에 값이 ㄷ르어가나");
+		    		}
+		   	 	}	
+		    }
+			
+			//****************************다이어리 , 알림 저장이 완료 **********************************	
+			//이미지 리스트 생성 
+			files = FileManager.MakeImages(multi);
+			
+			//위에서 작업 오류 였을 시 서버에 저장된 사진 삭제
+			if(dto.isError() ||titleOverSize||count>=3||contentOverSize||totalDiary>=1100||totalNotify >=100){
+				FileManager.DeleteUploadImages(files);
+				if(dto.isError()){
+					String result = API_ResponseCode.API_DB_0303();
+					out.println(result);
+				}					
+				return; //jsp 종료
+			}
+			//DB작업 오류가 아니었을 경우
+			else{
+				int imageCount=0; //가비지 카운트  ex) 4개 -> 1개로 수정할 경우 저장소의 가비지 남음.
+				if(files.size()!=0){
+					if(files!=null){
+						String filename = null;
+						File file = null;
+						File newFile = null;
+						String imageURL = null;
+					
+						for(int i=1; i<=files.size();i++){
+							switch(i){
+								case 1:
+									filename = multi.getFilesystemName("file1");
+									file = new File(uploadPath+"\\"+filename);
+									newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+									//사진 이동
+									imageURL = FileManager.RenameMoveFile(file, newFile,"MIF_Calendar_004");		
+									//파일 크기 체크
+									File filesize = multi.getFile("file1");
+									System.out.println("사진 크기 : " + filesize.length());							
+									//사진 DTO에 넣기
+									dto.setPhotoOne(imageURL);
+									System.out.println("절대주소 : "+dto.getPhotoOne());		
+									imageCount++;
+									System.out.println("file1");
+									break;
+								case 2:
+									filename = multi.getFilesystemName("file2");
+									file = new File(uploadPath+"\\"+filename);
+									newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+									//사진 이동
+									imageURL = FileManager.RenameMoveFile(file, newFile,"MIF_Calendar_004");								
+									//사진 DTO에 넣기
+									dto.setPhotoTwo(imageURL);
+									System.out.println("절대주소 : "+dto.getPhotoTwo());			
+									imageCount++;
+									System.out.println("file2");
+									break;
+								case 3:
+									filename = multi.getFilesystemName("file3");
+									file = new File(uploadPath+"\\"+filename);			
+									newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+									//사진 이동
+									imageURL = FileManager.RenameMoveFile(file, newFile,"MIF_Calendar_004");						
+									//사진 DTO에 넣기
+									dto.setPhotoThree(imageURL);
+									System.out.println("절대주소 : "+dto.getPhotoThree());		
+									imageCount++;
+									System.out.println("file3 ");
+									break;
+								case 4:
+									filename = multi.getFilesystemName("file4");
+									file = new File(uploadPath+"\\"+filename);
+									//사진 이동
+									newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+									imageURL = FileManager.RenameMoveFile(file, newFile,"MIF_Calendar_004");								
+									//사진 DTO에 넣기
+									dto.setPhotoFour(imageURL);
+									System.out.println("절대주소 : "+dto.getPhotoFour());	
+									imageCount++;
+									System.out.println("file4 ");
+									break;						
+							}
+						}											
+					}		
+				}
+				//혹시 모를 오류가 있을 경우 이미지 카운터 체크 
+				else{
+					if(dto.getPhotoOne()!=null){
+						imageCount++;
+					}
+					if(dto.getPhotoTwo()!=null){
+						imageCount++;
+					}
+					if(dto.getPhotoThree()!=null){
+						imageCount++;
+					}
+					if(dto.getPhotoFour()!=null){
+						imageCount++;
+					}
+					System.out.println("사진이 없습니다.");
+				}	
+				//필요없는 사진 지우기
+				FileManager.DeleteGarbageImage(dto.getDiaryID(), imageCount, imageDataPath);
+				//일기 사진 업데이트				
+				dto = dao.UpdatePhotoDiary(dto);
+				if(dto.isError()){
+					String result = API_ResponseCode.API_DB_0303();
+					out.println(result);
+				}else{
+					photoUpdate=true;	//사진 저장 완료
+				}
+				//정상 결과 값 보내기
+				out.println(JDataParser.Response_Calendar_004());		
+			}
+		}
+			
+		}catch(IOException e){
+		   	 //5. 사진 데이터가 너무 클 경우 API 응답코드
+			 String result = API_ResponseCode.API_CA_0005();
+			 out.println(result);
+		  	 e.printStackTrace();
+		}catch(Exception e){
+			 //결과 도중 서버와 DB에 저장된 데이터 삭제하기
+			 DeleteDiaryDAO deleteDAO = new DeleteDiaryDAO();
+
+			 //파일 생성만 했을 경우
+			 if(photoFileCreate){
+				 //업로드 파일 삭제
+				files = FileManager.MakeImages(multiBackup);
+				FileManager.DeleteUploadImages(files);
+			 }
+			 //기존 파일로 백업
+			 if(photoUpdate || notifyUpdate||diaryUpdate){
+				dao.BackUpDiary(backupDTO);
+			 }
+			
+			//500 Error
+			 String result = API_ResponseCode.API_HTTP_500();
+			 out.println(result);
+	 	 	 e.printStackTrace();
+		}
+	}
+%>
+    
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="EUC-KR">
+<title>일기 수정</title>
+</head>
+<body>
+
+</body>
+</html>

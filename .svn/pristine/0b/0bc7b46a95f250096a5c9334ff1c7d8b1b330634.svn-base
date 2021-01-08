@@ -1,0 +1,16 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8" import="Mypage.*, java.util.*"%>
+
+<%
+	request.setCharacterEncoding("utf-8");
+String json = request.getParameter("json"); // 앱에서 JSON 파일 가져오기
+
+System.out.println("앱에서온 삭제 데이터 :" + json);
+
+NotifyUpdateDAO nud = new NotifyUpdateDAO();
+List<NotifyDO> notifyNOList = nud.JsonParser(json);
+
+if (notifyNOList.size() != 0) {
+	nud.UpdatetNotifyOnOff(notifyNOList);
+}
+%>

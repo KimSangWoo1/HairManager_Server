@@ -1,0 +1,214 @@
+package Calendar;
+
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLDataException;
+import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
+import java.util.ArrayList;
+import java.util.List;
+
+
+import Common.CommonData;
+
+public class CalendarDAO {
+	
+	final private String jdbc_class = CommonData.getJdbc_Class();
+	final private String jdbc_url= CommonData.getJdbc_Url();
+	final private String DB_ID = CommonData.getDB_ID();
+	final private String DB_PW = CommonData.getDB_PW();
+	
+	Connection conn; 
+	PreparedStatement pstmt; 
+	
+	public void Open() {
+		try {
+			Class.forName(jdbc_class);
+			conn=DriverManager.getConnection(jdbc_url,DB_ID,DB_PW);
+			System.out.println("DB Connection Success");
+		}catch(Exception e) {
+			e.printStackTrace();
+		}				
+	}
+
+	public void Close() {
+		try {
+			pstmt.close();
+			conn.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}	
+	
+	//�뀒�뒪�듃 �슜 �씪湲� �옉�꽦�떆
+	public void InsertDB(CalendarDTO dto){
+			Open();
+			String sql="insert into TBL_Diary(ProductName,ProductPrice) values(?,?)";
+			try {
+				pstmt= conn.prepareStatement(sql);
+				pstmt.setInt(1,dto.getUserNO());
+			//	pstmt.setInt(2,dto.getMonth());
+				
+				pstmt.executeUpdate();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} finally {
+				Close();
+			}
+		}
+	
+	//罹섎┛�뜑 �젙蹂� 諛쏆븘�삤湲�
+	public List<CalendarDTO> SelectMonth(int _no, String _month)
+	{
+		Open(); 
+		//�삁�떆 : SELECT * from TBL_DIARY  WHERE user_NO='1' AND diary_DT LIKE MONTH('2020-10-%');
+		String sql= "SELECT user_NO, diary_DT, diary_ID, diary_title FROM TBL_DIARY WHERE user_NO=? AND diary_DT LIKE ?";
+		ArrayList<CalendarDTO> datas = new ArrayList<>();
+		try {
+			pstmt= conn.prepareStatement(sql);
+			pstmt.setInt(1,_no);
+			pstmt.setString(2,_month);
+			ResultSet rs= pstmt.executeQuery();
+			
+			while(rs.next()) {
+				CalendarDTO dto = new CalendarDTO();
+				dto.setUserNO(rs.getInt("user_NO"));
+				dto.setDiaryNO(rs.getInt("diary_ID"));
+				dto.setDiaryDate(rs.getString("diary_DT"));
+				dto.setTitle(rs.getString("diary_title"));
+				datas.add(dto);
+			}
+			rs.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}finally {
+			Close();
+		}
+		return datas;
+	}
+	
+	//�긽�꽭 �씪湲� �젙蹂� �뜲�씠�꽣 諛쏆븘�삤湲�
+	public DiaryDTO DetailDiary(int userNO, int diaryID, String diaryDate){
+		
+		Open(); 
+		//�긽�꽭 �씪湲� �젙蹂� 荑쇰━   STR_TO_DATE 臾몄옄瑜� Date �삎�떇�쑝濡� 蹂�寃쏀븿
+		String sql= "SELECT diary_title, diary_text, notify_check FROM TBL_DIARY WHERE user_NO=? AND diary_ID=? AND diary_DT = STR_TO_DATE(?,?)";
+		//�궗吏� 荑쇰━
+		String sql_photo = "SELECT photo_one, photo_two, photo_three, photo_four FROM TBL_PHOTO WHERE diary_ID=?";
+		//�븣由� 荑쇰━
+		String sql_notify = "SELECT notify_ID ,notify_date, notify_time FROM TBL_NOTIFY WHERE user_NO=? AND diary_ID=?";
+		DiaryDTO dto = new DiaryDTO();
+		
+		try {
+			//�떎�씠�뼱由� �뜲�씠�꽣 媛��졇�삤湲�
+			pstmt= conn.prepareStatement(sql);
+			pstmt.setInt(1,userNO);
+			pstmt.setInt(2,diaryID);
+			pstmt.setString(3,diaryDate);
+			pstmt.setString(4,"%Y-%m-%d");
+			
+			ResultSet rs= pstmt.executeQuery();
+			if(rs.next()) {
+				dto.setDiaryTitle(rs.getString("diary_title"));
+				dto.setDiaryContent(rs.getString("diary_text"));
+				dto.setNotifyCheck(rs.getBoolean("notify_check"));
+				
+		
+				rs.close();
+			}else
+			{
+				System.out.println("寃��깋�맂 �떎�씠�뼱由ш� �뾾�뒿�땲�떎.");
+				return null;
+			}
+			
+			//�궗吏� �뜲�씠�꽣 媛��졇�삤湲�
+			pstmt= conn.prepareStatement(sql_photo);
+			pstmt.setInt(1,diaryID);	
+			ResultSet rs_photo= pstmt.executeQuery();	
+			
+			if(rs_photo.next()) {
+				dto.setPhotoOne(rs.getString("photo_one"));
+				dto.setPhotoTwo(rs.getString("photo_two"));
+				dto.setPhotoThree(rs.getString("photo_three"));
+				dto.setPhotoFour(rs.getString("photo_four"));
+				
+				rs_photo.close();
+			}else {
+				System.out.println("寃��깋�맂 �궗吏꾩씠 �뾾�뒿�땲�떎.");
+			}
+			//�븣由� �뜲�씠�꽣 媛��졇�삤湲�
+			pstmt = conn.prepareStatement(sql_notify);
+			pstmt.setInt(1,userNO);
+			pstmt.setInt(2,diaryID);
+			ResultSet rs_notify= pstmt.executeQuery();
+			
+			if(rs_notify.next()) {
+				dto.setNotifyID(rs_notify.getInt("notify_ID"));		
+				dto.setNotifyDate(rs_notify.getDate("notify_date").toString());
+				dto.setNotifyTime(rs_notify.getString("notify_time"));
+				rs_notify.close();
+			}else {
+				System.out.println("寃��깋�맂 �븣由쇱씠 �뾾�뒿�땲�떎.");
+			}
+			
+				
+			
+			
+		}catch(SQLSyntaxErrorException e) {
+			e.printStackTrace(); //SQL 臾� �옒紐삳릱�쓣 寃쎌슦
+		}catch(SQLDataException e) {
+			e.printStackTrace(); //SQL 臾� �옒紐삳릱�쓣 寃쎌슦
+		}catch (SQLException e) {
+			e.printStackTrace();
+		}finally {
+			Close();
+		}
+		return dto;
+	}
+	
+	//�뀒�뒪�듃 �슜 �긽�꽭�씪湲곗젙蹂� �럹�씠吏��뿉�꽌 �씪湲� �궘�젣�떆 
+	public void DeleteDB(int no) {
+		Open();
+		String sql="delete from TBL_Diary where UserNO = ?";
+		try {
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setInt(1,no);
+			pstmt.executeUpdate();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		finally {
+			Close();
+		}
+	}
+	
+	//�뀒�뒪�듃 �슜 �씪湲� �닔�젙�븷 �뻹 
+	public void UpdateDB(CalendarDTO dto) {
+		Open();
+		String sql="update TBL_Product set productName=?, productPrice=? where productNO=?";
+		try {
+			/*
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setString(1,dto.getUserNO());
+			pstmt.setInt(2,dto.getDiaryNO());
+			pstmt.setInt(3,dto.getProductNO());
+			*/
+			pstmt.executeUpdate();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		finally {
+			Close();
+		}
+	}
+
+}
+

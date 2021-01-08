@@ -1,0 +1,86 @@
+package login;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import Common.CommonData;
+
+// 핸드폰번호 중복확인을 수행한다.
+public class OverlapPhoneNODAO {
+
+	final private String jdbc_class = CommonData.getJdbc_Class();
+	final private String jdbc_url = CommonData.getJdbc_Url();
+	final private String DB_ID = CommonData.getDB_ID();
+	final private String DB_PW = CommonData.getDB_PW();
+
+	Connection conn;
+	PreparedStatement pstmt;
+	ResultSet rs = null;
+
+	// 데이터베이스 연결
+	public void Open() {
+		try {
+			Class.forName(jdbc_class);
+			conn = DriverManager.getConnection(jdbc_url, DB_ID, DB_PW);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	// 데이터베이스 연결 종료
+	public void Close() {
+		try {
+			pstmt.close();
+			conn.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// 앱에서 받은 JSON데이터 파싱
+	public String JsonParser(String data) {
+		String user_phoneNO = null;
+		try {
+			JSONParser jsonParser = new JSONParser();
+			JSONObject jsonObject = (JSONObject) jsonParser.parse(data);
+
+			user_phoneNO = jsonObject.get("user_phoneNO").toString();
+		} catch (Exception e) {
+		}
+		return user_phoneNO;
+	}
+
+	// 데이터베이스와 통신하여 핸드폰번호중복을 확인한다.
+	public String OverlapPhoneNOCheck(String user_phoneNO) {
+		Open();
+		String returns = "";
+		try {
+			String sql = "SELECT phone_NO FROM TBL_USER WHERE phone_NO = ?";// 조회
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setString(1, user_phoneNO);
+			rs = pstmt.executeQuery();
+			if (rs.next()) {
+				if (rs.getFetchSize() > 1) {
+					System.out.println("DB에 중복된 이메일이 존재합니다. 확인하세요.");
+				} else {
+					// DB에 대항 폰번호가 이미 존재할 경우
+					returns = "LO_0005";
+				}
+			} else {
+				returns = "SY_2000";
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			Close();
+		}
+		return returns;
+	}
+
+}

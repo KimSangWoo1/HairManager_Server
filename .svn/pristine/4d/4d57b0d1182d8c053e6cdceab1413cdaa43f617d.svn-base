@@ -1,0 +1,505 @@
+package Calendar;
+
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLDataException;
+import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
+import java.util.ArrayList;
+import java.util.List;
+
+
+import Common.CommonData;
+
+public class CalendarDAO {
+	
+	final private String jdbc_class = CommonData.getJdbc_Class();
+	final private String jdbc_url= CommonData.getJdbc_Url();
+	final private String DB_ID = CommonData.getDB_ID();
+	final private String DB_PW = CommonData.getDB_PW();
+	
+	Connection conn; 
+	PreparedStatement pstmt; 
+	
+	public void Open() {
+		try {
+			Class.forName(jdbc_class);
+			conn=DriverManager.getConnection(jdbc_url,DB_ID,DB_PW);
+			System.out.println("DB Connection Success");
+		}catch(Exception e) {
+			e.printStackTrace();
+		}				
+	}
+
+	public void Close() {
+		try {
+			pstmt.close();
+			conn.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}	
+	//일기 작성 전에 해당 날짜에 기록된 일기가 몇개 있는지 가져온다.
+	public int CheckWirteOverDiary(DiaryDTO dto) {
+		Open();
+		int count =3;
+		String sql = "SELECT COUNT(diary_ID) 'count' FROM TBL_DIARY WHERE user_NO=? AND diary_DT =?";
+		try {
+			pstmt =conn.prepareStatement(sql);
+			pstmt.setInt(1, dto.getUserNO());
+			pstmt.setString(2, dto.getDiaryDate());
+			
+			ResultSet rs = pstmt.executeQuery();
+			rs.next();
+			count = rs.getInt("count");
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+		finally {
+			Close();
+		}
+		return count;
+	}
+	//일기 작성 TBL_DIARY
+	public DiaryDTO WriteDiaryDB(DiaryDTO dto){
+			Open();
+			String sql="INSERT INTO TBL_DIARY(user_NO, diary_DT, diary_title, diary_text, notify_check) VALUES(?,?,?,?,?)";
+			try {
+				pstmt= conn.prepareStatement(sql);
+				pstmt.setInt(1,dto.getUserNO());
+				pstmt.setString(2,dto.getDiaryDate());
+				pstmt.setString(3,dto.getDiaryTitle());
+				pstmt.setString(4,dto.getDiaryContent());
+				pstmt.setBoolean(5,dto.isNotifyCheck());
+				pstmt.executeUpdate();
+				
+				//작성된 다이어리 ID 받아오기
+				int diary_id = PickDiaryID(dto);
+				//오류 처리
+				if(diary_id==0) {
+					throw new Exception();
+				}
+				//다이어리 ID 삽입
+				dto.setDiaryID(diary_id);			
+				
+			}catch (SQLSyntaxErrorException e) {
+				e.printStackTrace();
+			}catch (SQLException e) {
+				e.printStackTrace();
+			}catch (Exception e) {
+				e.printStackTrace();
+			}finally {
+				Close();
+			}
+			return dto;
+	}
+	//일기 작성시 다이어리 ID 가져오기
+	private int PickDiaryID(DiaryDTO dto) {
+	
+		//ID에 지정한 날짜 가장 마지막으로 작성된 일기 Diary_ID 한개 가져오기
+		String sql="SELECT diary_ID FROM TBL_DIARY WHERE user_NO=? AND diary_DT =?  ORDER BY diary_ID DESC LIMIT 1";
+		int diary_id=0;
+		try {
+			pstmt= conn.prepareStatement(sql);
+			pstmt.setInt(1, dto.getUserNO());
+			pstmt.setString(2, dto.getDiaryDate());
+			ResultSet rs= pstmt.executeQuery();
+			rs.next();
+			diary_id= rs.getInt("diary_ID");
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}catch (Exception e) {
+			e.printStackTrace();
+		}
+		return diary_id;
+	}
+	
+	//일기 작성시 다이어리 작성 후 TBL_NOTIFY 데이터 생성
+	public void WriteNotifyDB(DiaryDTO dto) {			
+		Open();
+		String notifySql="INSERT INTO TBL_NOTIFY(notify_switch, notify_date, notify_time, diary_ID, user_NO) VALUES(?,?,?,?,?)";
+		try {
+			//알림이 True일 경우 TBL_Notify에 Notify 데이터를 생성	
+				pstmt= conn.prepareStatement(notifySql);
+				pstmt.setBoolean(1,dto.isNotifySwitch());
+				pstmt.setString(2,dto.getNotifyDate());
+				pstmt.setString(3,dto.getNotifyTime());
+				pstmt.setInt(4,dto.getDiaryID());
+				pstmt.setInt(5,dto.getUserNO());
+				pstmt.executeUpdate();			
+		}catch (SQLException e) {
+			e.printStackTrace();
+		}catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			Close();
+		}	
+	}
+	
+	//일기 작성시 다이어리 작성 후 TBL_PHOTO 데이터 생성
+	public void WritePhotoDB(DiaryDTO dto) {		
+		Open();
+		String photoSql="INSERT INTO TBL_PHOTO(diary_ID, photo_one, photo_two, photo_three, photo_four) VALUES(?,?,?,?,?)";
+		try {
+			pstmt= conn.prepareStatement(photoSql);
+			pstmt.setInt(1,dto.getDiaryID());
+			
+			if(dto.getPhotoOne()==null) {
+				pstmt.setString(2,null);
+			}else {
+				pstmt.setString(2,dto.getPhotoOne());
+			}
+			
+			if(dto.getPhotoTwo()==null) {
+				pstmt.setString(3,null);
+			}else {
+				pstmt.setString(3,dto.getPhotoTwo());
+			}
+			
+			if(dto.getPhotoThree()==null) {
+				pstmt.setString(4,null);
+			}else {
+				pstmt.setString(4,dto.getPhotoThree());
+			}
+
+			if(dto.getPhotoFour()==null) {
+				pstmt.setString(5,null);
+			}else {
+				pstmt.setString(5,dto.getPhotoFour());
+			}
+	
+			pstmt.executeUpdate();			
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			Close();
+		}	
+	}
+	
+	//일기 수정 TBL_DIARY
+	public DiaryDTO UpdateDiaryDB(DiaryDTO dto){
+			Open();
+			String sql="UPDATE TBL_DIARY SET diary_DT=? ,diary_title=? ,diary_text=?, notify_check=? WHERE user_NO=? AND diary_ID=?";
+			try {
+				pstmt= conn.prepareStatement(sql);
+				pstmt.setString(1,dto.getDiaryDate());
+				pstmt.setString(2,dto.getDiaryTitle());
+				pstmt.setString(3,dto.getDiaryContent());
+				pstmt.setBoolean(4,dto.isNotifyCheck());
+				pstmt.setInt(5, dto.getUserNO());
+				pstmt.setInt(6, dto.getDiaryID());
+				pstmt.executeUpdate();	
+			}catch (SQLSyntaxErrorException e) {
+				e.printStackTrace();
+			}catch (SQLException e) {
+				e.printStackTrace();
+			}catch (Exception e) {
+				e.printStackTrace();
+			}finally {
+				Close();
+			}
+			return dto;
+	}
+
+	//일기 수정 TBL_PHOTO
+	public DiaryDTO UpdatePhotoDiary(DiaryDTO dto) {
+			Open();
+			String sql="UPDATE TBL_PHOTO SET photo_one=? ,photo_two=? ,photo_three=?, photo_four=? WHERE diary_ID=?";
+			try {
+				pstmt= conn.prepareStatement(sql);
+				pstmt.setString(1,dto.getPhotoOne());
+				pstmt.setString(2,dto.getPhotoTwo());
+				pstmt.setString(3,dto.getPhotoThree());
+				pstmt.setString(4,dto.getPhotoFour());
+				pstmt.setInt(5, dto.getDiaryID());
+				pstmt.executeUpdate();	
+			}catch (SQLSyntaxErrorException e) {
+				e.printStackTrace();
+			}catch (SQLException e) {
+				e.printStackTrace();
+			}catch (Exception e) {
+				e.printStackTrace();
+			}finally {
+				Close();
+			}
+			return dto;
+	}
+	
+	//일기 수정 TBL_NOTIFY
+	public DiaryDTO UpdateNotifyDiary(DiaryDTO dto) {
+		Open();
+		String sql="UPDATE TBL_NOTIFY SET notify_switch=? ,notify_date=? ,notify_time=? WHERE notify_ID=? AND user_NO=? AND diary_ID=?";
+		try {
+			pstmt= conn.prepareStatement(sql);
+			pstmt.setBoolean(1,dto.isNotifySwitch());
+			pstmt.setString(2,dto.getNotifyDate());
+			pstmt.setString(3,dto.getNotifyTime());
+			pstmt.setInt(4,dto.getNotifyID());
+			pstmt.setInt(5, dto.getUserNO());
+			pstmt.setInt(6, dto.getDiaryID());
+			
+			pstmt.executeUpdate();	
+		}catch (SQLSyntaxErrorException e) {
+			e.printStackTrace();
+		}catch (SQLException e) {
+			e.printStackTrace();
+		}catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			Close();
+		}
+		return dto;
+	}
+
+
+	//캘린더 정보 받아오기
+	public List<CalendarDTO> SelectMonth(int _no, String _month)
+	{
+		Open(); 
+		//예시 : SELECT * from TBL_DIARY  WHERE user_NO='1' AND diary_DT LIKE MONTH('2020-10-%');
+		String sql= "SELECT user_NO, diary_DT, diary_ID, diary_title FROM TBL_DIARY WHERE user_NO=? AND diary_DT LIKE ?";
+		ArrayList<CalendarDTO> datas = new ArrayList<>();
+		try {
+			pstmt= conn.prepareStatement(sql);
+			pstmt.setInt(1,_no);
+			pstmt.setString(2,_month);
+			System.out.println("캘린더 날짜"+_month);
+			ResultSet rs= pstmt.executeQuery();
+			
+			while(rs.next()) {
+				CalendarDTO dto = new CalendarDTO();
+				dto.setUserNO(rs.getInt("user_NO"));
+				dto.setDiaryNO(rs.getInt("diary_ID"));
+				dto.setDiaryDate(rs.getString("diary_DT"));
+				dto.setTitle(rs.getString("diary_title"));
+				datas.add(dto);
+			}
+			rs.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}finally {
+			Close();
+		}
+		return datas;
+	}
+	
+	//상세 일기 정보 데이터 받아오기
+	public DiaryDTO DetailDiary(int userNO, int diaryID, String diaryDate){
+		
+		Open(); 
+		//상세 일기 정보 쿼리   STR_TO_DATE 문자를 Date 형식으로 변경함
+		String sql= "SELECT diary_DT, diary_title, diary_text, notify_check FROM TBL_DIARY WHERE user_NO=? AND diary_ID=? AND diary_DT = STR_TO_DATE(?,?)";
+		//사진 쿼리
+		String sql_photo = "SELECT photo_one, photo_two, photo_three, photo_four FROM TBL_PHOTO WHERE diary_ID=?";
+		//알림 쿼리
+		String sql_notify = "SELECT notify_ID ,notify_switch, notify_date, notify_time FROM TBL_NOTIFY WHERE user_NO=? AND diary_ID=?";
+		DiaryDTO dto = new DiaryDTO();
+		
+		try {
+			//다이어리 데이터 가져오기
+			pstmt= conn.prepareStatement(sql);
+			pstmt.setInt(1,userNO);
+			pstmt.setInt(2,diaryID);
+			pstmt.setString(3,diaryDate);
+			pstmt.setString(4,"%Y-%m-%d");
+			
+			ResultSet rs= pstmt.executeQuery();
+			if(rs.next()) {
+				dto.setDiaryDate(rs.getString("diary_DT"));
+				dto.setDiaryTitle(rs.getString("diary_title"));
+				dto.setDiaryContent(rs.getString("diary_text"));
+				dto.setNotifyCheck(rs.getBoolean("notify_check"));
+		
+				rs.close();
+			}else
+			{
+				System.out.println("검색된 다이어리가 없습니다.");
+				return null;
+			}
+			//사진 데이터 가져오기
+			pstmt= conn.prepareStatement(sql_photo);
+			pstmt.setInt(1,diaryID);	
+			ResultSet rs_photo= pstmt.executeQuery();	
+			
+			if(rs_photo.next()) {
+				dto.setPhotoOne(rs_photo.getString("photo_one"));
+				dto.setPhotoTwo(rs_photo.getString("photo_two"));
+				dto.setPhotoThree(rs_photo.getString("photo_three"));
+				dto.setPhotoFour(rs_photo.getString("photo_four"));
+				
+				rs_photo.close();
+			}else {
+				System.out.println("검색된 사진이 없습니다.");
+			}
+			//알림 데이터 가져오기
+			pstmt = conn.prepareStatement(sql_notify);
+			pstmt.setInt(1,userNO);
+			pstmt.setInt(2,diaryID);
+			ResultSet rs_notify= pstmt.executeQuery();
+			
+			if(rs_notify.next()) {
+				dto.setNotifyID(rs_notify.getInt("notify_ID"));		
+				dto.setNotifySwitch(rs_notify.getBoolean("notify_switch"));	
+				dto.setNotifyDate(rs_notify.getDate("notify_date").toString());
+				dto.setNotifyTime(rs_notify.getString("notify_time"));
+				rs_notify.close();
+			}else {
+				System.out.println("검색된 알림이 없습니다.");
+			}		
+		}catch(SQLSyntaxErrorException e) {
+			e.printStackTrace(); //SQL 문 잘못됐을 경우
+		}catch(SQLDataException e) {
+			e.printStackTrace(); //SQL 문 잘못됐을 경우
+		}catch (SQLException e) {
+			e.printStackTrace();
+		}finally {
+			Close();
+		}
+		return dto;
+	}
+	
+	// 상세일기정보 페이지에서 일기 삭제시 
+	public void DeleteDB(DiaryDTO dto) {
+		
+		Open();
+		String sql="DELETE FROM TBL_DIARY WHERE user_NO = ? AND diary_ID = ? AND diary_DT = ?";
+		try {
+			int userNO = dto.getUserNO();
+			int diaryID = dto.getDiaryID();
+			String diaryDate = dto.getDiaryDate();
+		
+			DeletePhoto(diaryID);  //사진 삭제
+			WriteDeleteNotiy(userNO, diaryID, diaryDate);  //알림 삭제
+			
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setInt(1,userNO);
+			pstmt.setInt(2,diaryID);
+			pstmt.setString(3,diaryDate);
+			pstmt.executeUpdate();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		finally {
+			Close();
+		}
+	}
+	//일기 삭제 할 때 사진 데이터 삭제
+	private void DeletePhoto(int diaryID) {
+		String sql="DELETE FROM TBL_PHOTO WHERE diary_ID = ?";	
+		try {
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setInt(1,diaryID);
+			pstmt.executeUpdate();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	//일기 삭제시 알림 삭제
+	public void WriteDeleteNotiy(int userNO, int diaryID, String diaryDate) {
+		String sql="SELECT notify_check FROM TBL_DIARY WHERE user_NO = ? AND diary_ID = ? AND diary_DT = ?";
+		String notiyDeleteSql="DELETE  FROM TBL_NOTIFY WHERE user_NO = ? AND diary_ID = ? ";
+		try {
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setInt(1,userNO);
+			pstmt.setInt(2,diaryID);
+			pstmt.setString(3,diaryDate);
+			
+			ResultSet rs= pstmt.executeQuery();
+			rs.next();
+			boolean notifyCheck = rs.getBoolean("notify_check");
+			
+			//알림이 켜져 있을 시 알림 데이터 삭제
+			if(notifyCheck) {
+				pstmt=conn.prepareStatement(notiyDeleteSql);
+				pstmt.setInt(1,userNO);
+				pstmt.setInt(2,diaryID);
+				pstmt.executeUpdate();
+			}else {
+				return;
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	//일기 수정시 알림 삭제할 때 
+	public void UpdateDeleteNotiy(int userNO, int diaryID, String diaryDate) {
+		Open();
+		String notiyDeleteSql="DELETE  FROM TBL_NOTIFY WHERE user_NO = ? AND diary_ID = ? ";
+		try {		
+			pstmt=conn.prepareStatement(notiyDeleteSql);
+			pstmt.setInt(1,userNO);
+			pstmt.setInt(2,diaryID);
+			pstmt.executeUpdate();
+		
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}finally {
+			Close();
+		}
+	}
+	
+	public int GarbageImage(int diaryID) {
+		Open();
+		String sql = "SELECT photo_one, photo_two, photo_three, photo_four FROM TBL_PHOTO WHERE diary_ID=?";
+		int count=0;
+		try {
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setInt(1,diaryID);
+			
+			ResultSet rs= pstmt.executeQuery();
+
+			rs.next();
+			
+			String photoOne = rs.getString("photo_one");
+			String photoTwo = rs.getString("photo_two");
+			String photoThree = rs.getString("photo_three");
+			String photoFour = rs.getString("photo_four");
+			
+			if(photoOne!=null) {
+				if(photoOne.trim().isEmpty()) {
+					if(!photoOne.equals("null")) {
+						count++;
+					}
+				}
+			}
+			if(photoTwo!=null) {
+				if(photoTwo.trim().isEmpty()) {
+					if(!photoTwo.equals("null")) {
+						count++;
+					}
+				}
+			}
+			if(photoThree!=null) {
+				if(photoThree.trim().isEmpty()) {
+					if(!photoThree.equals("null")) {
+						count++;
+					}
+				}
+			}
+			if(photoFour!=null) {
+				if(photoFour.trim().isEmpty()) {
+					if(!photoFour.equals("null")) {
+						count++;
+					}
+				}
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally {
+			Close();
+		}
+		return count;
+	}
+
+}
+

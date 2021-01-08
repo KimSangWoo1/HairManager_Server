@@ -1,0 +1,21 @@
+package Common;
+
+public class CommonData {
+	static final private String jdbc_class="org.mariadb.jdbc.Driver";
+	static final private String jdbc_url="jdbc:mariadb://121.169.194.198:3306/hairmanager"; 
+	static final private String id="planty"; 
+	static final private String password="Planty2020"; 
+
+	public static String getJdbc_Class() {	
+		return jdbc_class;
+	}
+	public static String getJdbc_Url() {	
+		return jdbc_url;
+	}
+	public static String getDB_ID() {	
+		return id;
+	}
+	public static String getDB_PW() {	
+		return password;
+	}
+}

@@ -1,0 +1,147 @@
+package Calendar;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import Common.CommonData;
+
+public class DeleteDiaryDAO {
+
+	final private String jdbc_class = CommonData.getJdbc_Class();
+	final private String jdbc_url= CommonData.getJdbc_Url();
+	final private String DB_ID = CommonData.getDB_ID();
+	final private String DB_PW = CommonData.getDB_PW();
+	
+	Connection conn; 
+	PreparedStatement pstmt; 
+
+	public void Open() {
+		try {
+			Class.forName(jdbc_class);
+			conn=DriverManager.getConnection(jdbc_url,DB_ID,DB_PW);
+		}catch(Exception e) {
+			e.printStackTrace();
+		}				
+	}
+
+	public void Close() {
+		try {
+			pstmt.close();
+			conn.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}	
+	// 상세일기정보 페이지에서 일기 삭제시 
+		public String DeleteDiaryDB(DiaryDTO dto) {
+			String code= "SY_2000";
+			Open();
+			String sql="DELETE FROM TBL_DIARY WHERE user_NO = ? AND diary_ID = ? AND diary_DT = ?";
+			try {
+				int userNO = dto.getUserNO();
+				int diaryID = dto.getDiaryID();
+				String diaryDate = dto.getDiaryDate();
+			
+				//사진 삭제
+				code = DeletePhoto(diaryID);  
+				if(code.equals("DB_0303")){
+					return code;
+				}
+				//알림 삭제
+				code = WriteDeleteNotify(userNO, diaryID, diaryDate);  
+				if(code.equals("DB_0303")){
+					return code;
+				}
+				//일기 삭제
+				pstmt=conn.prepareStatement(sql);
+				pstmt.setInt(1,userNO);
+				pstmt.setInt(2,diaryID);
+				pstmt.setString(3,diaryDate);
+				pstmt.executeUpdate();
+			} catch (SQLException e) {
+				e.printStackTrace();
+				code ="DB_0303";
+			}
+			finally {
+				Close();
+			}
+			return code;
+		}
+		
+		//일기 삭제 할 때 사진 데이터 삭제
+		public String DeletePhoto(int diaryID) {
+			String code= "SY_2000";
+			String sql="DELETE FROM TBL_PHOTO WHERE diary_ID = ?";	
+			try {
+				pstmt=conn.prepareStatement(sql);
+				pstmt.setInt(1,diaryID);
+				pstmt.executeUpdate();
+			} catch (SQLException e) {
+				e.printStackTrace();
+				code ="DB_0303";
+			
+			}
+			return code;
+		}
+		
+		//일기 삭제시 알림 삭제
+		public String WriteDeleteNotify(int userNO, int diaryID, String diaryDate) {
+			String code= "SY_2000";
+			String sql="SELECT notify_check FROM TBL_DIARY WHERE user_NO = ? AND diary_ID = ? AND diary_DT = ?";
+			String notiyDeleteSql="DELETE  FROM TBL_NOTIFY WHERE user_NO = ? AND diary_ID = ? ";
+			try {
+				pstmt=conn.prepareStatement(sql);
+				pstmt.setInt(1,userNO);
+				pstmt.setInt(2,diaryID);
+				pstmt.setString(3,diaryDate);
+				
+				ResultSet rs= pstmt.executeQuery();
+				rs.next();
+				boolean notifyCheck = rs.getBoolean("notify_check");
+				
+				//알림이 켜져 있을 시 알림 데이터 삭제
+				if(notifyCheck) {
+					pstmt=conn.prepareStatement(notiyDeleteSql);
+					pstmt.setInt(1,userNO);
+					pstmt.setInt(2,diaryID);
+					pstmt.executeUpdate();
+				}else {
+					return code;
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+				code ="DB_0303";
+			}
+			return code;
+		}
+		
+		// 상세일기정보 페이지에서 일기 삭제시 
+		public String ErrorWitheDiaryDB(DiaryDTO dto) {
+			String code= "SY_2000";
+			Open();
+			String sql="DELETE FROM TBL_DIARY WHERE user_NO = ? AND diary_ID = ? AND diary_DT = ?";
+			try {
+				int userNO = dto.getUserNO();
+				int diaryID = dto.getDiaryID();
+				String diaryDate = dto.getDiaryDate();
+			
+				//일기 삭제
+				pstmt=conn.prepareStatement(sql);
+				pstmt.setInt(1,userNO);
+				pstmt.setInt(2,diaryID);
+				pstmt.setString(3,diaryDate);
+				pstmt.executeUpdate();
+			} catch (SQLException e) {
+				e.printStackTrace();
+				code ="DB_0303";
+			}
+			finally {
+				Close();
+			}
+			return code;
+		}
+}

@@ -1,0 +1,52 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="EUC-KR" import="Mypage.* , java.util.* , Common.*"%>
+
+<%
+int userNO;      //유저 번호 (PK)
+String userEmail;
+String userProfile;
+
+request.setCharacterEncoding("UTF-8"); // Set Chracter 
+//GET 들어올 때
+if(request.getMethod().equals("GET")){
+   try{
+      System.out.println("회원 기본 정보 GET!!");
+      
+      System.out.println("서버 : " + request.getServerName());
+      System.out.println("포트번호 : " + request.getServerPort());
+      System.out.println("요청방식 : " + request.getMethod());
+      System.out.println("프로토콜 : " + request.getProtocol());
+      System.out.println("URL : " + request.getRequestURL());
+      System.out.println("URI : " + request.getRequestURI());
+     
+      //Get Parmater 받기
+      userNO = Integer.parseInt(request.getParameter("userNO")); 
+      String  _userNO=request.getParameter("userNO");
+      System.out.println("asdasd"+_userNO);
+      
+      // DAO 접근
+      MyPageDAO dao = new MyPageDAO();
+      UserProfileDTO dto = new UserProfileDTO();
+      dto = dao.MyPageInformation(userNO);
+      //Get 파라메터 변수 받기
+      String json = JDataParser.Response_MyPage_001(dto);
+      
+      System.out.println(json);
+      out.println(json);
+      
+   }catch(Exception e){
+	   e.printStackTrace();
+   }
+}
+      //마리아DB Date형 쿼리하기 위해 String 변환
+%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>마이페이지</title>
+</head>
+<body>
+
+</body>
+</html>

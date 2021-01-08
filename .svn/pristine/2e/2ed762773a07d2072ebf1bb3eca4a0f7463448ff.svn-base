@@ -1,0 +1,114 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="EUC-KR" import="Calendar.*, java.util.*"%>
+<%@ page import="org.json.simple.*" %>
+<%@ page import="java.io.*" %>
+<%@ page import="org.json.simple.parser.*" %>
+<%@ page import="java.text.SimpleDateFormat" %>
+
+<%
+	//PK variable
+	int userNO;
+	int diaryID;
+	//다이어리
+	String diaryDate;
+	String diaryTitle;
+	String diaryContent;
+	boolean notifyCheck;
+	//포토
+	String photoOne;
+	String photoTwo;
+	String photoThree;
+	String photoFour;
+	//알림
+	int notifyID;
+	String notifyDate;
+	String notifyTime;
+
+	request.setCharacterEncoding("UTF-8"); // Set Chracter 
+	//GET 들어올 때
+	if(request.getMethod().equals("GET")){
+		try{
+			System.out.println("Android Detail Diary GET!!");
+			
+			System.out.println("서버 : " + request.getServerName());
+			System.out.println("포트번호 : " + request.getServerPort());
+			System.out.println("요청방식 : " + request.getMethod());
+			System.out.println("프로토콜 : " + request.getProtocol());
+			System.out.println("URL : " + request.getRequestURL());
+			System.out.println("URI : " + request.getRequestURI());
+		
+			CalendarDAO dao= new CalendarDAO();	
+			//API MIF-Calnedar-002  Response JSON 만들어주기 
+			JSONObject json = new JSONObject(); // All data ..데이터 보낼 전체 Json 그릇
+			JSONArray jsonPhotoListArray = new JSONArray(); //photoList (Key) ..사진리스트 Json 
+			JSONArray jsonNotifyListArray = new JSONArray(); //NotifyList (Key) ..알림리스트 Json 
+			JSONObject jsonData = new JSONObject(); // data (Key) ..Response 데이터 담을 그릇 [diary List 포함됨]
+
+			//코드 Class에서 가져오기 --수정 필요
+			json.put("code","SY_2000");
+			json.put("message","SUCCESS");
+			
+			//Get 파라메터 변수 받기
+			int _userNO = Integer.parseInt(request.getParameter("userNO"));
+			int _diaryID = Integer.parseInt(request.getParameter("diaryID"));
+			String _diaryDate = request.getParameter("date");
+			System.out.println("유저 넘버 : "+_userNO);
+			System.out.println("일기 번호 : "+_diaryID);
+			System.out.println("날짜 : "+_diaryDate);
+			
+			// !!포멧검사 해야함
+			SimpleDateFormat dataFormat= new SimpleDateFormat("yyyy-mm-dd");
+			
+			//*ERROR GET PARAMETER NULL CHECK*
+			if(_userNO==0||_diaryID==0||_diaryDate==null){
+				json.put("code","FA_1000");
+				json.put("message","GET PARAMETER가 없습니다.");
+				System.out.println("Get PARAMETER 오류 NULL!!");
+			}else{
+				DiaryDTO data = dao.DetailDiary(_userNO, _diaryID, _diaryDate);	
+				System.out.println("상세 일기 정보 JSON Object 생성");
+				//다이어리 일기 JSON에 넣기
+				JSONObject jsonDiary = new JSONObject();
+				jsonData.put("diaryDate",data.getDiaryDate());
+				jsonData.put("diaryTitle",data.getDiaryTitle());
+				jsonData.put("diaryContent",data.getDiaryContent());						
+				jsonData.put("notifyCheck",data.isNotifyCheck());
+				
+				//다이어리 사진 JSON에 넣기
+				JSONObject jsonPhoto = new JSONObject();
+				jsonPhoto.put("photoOne",data.getPhotoOne());
+				jsonPhoto.put("photoTwo",data.getPhotoTwo());
+				jsonPhoto.put("photoThree",data.getPhotoThree());
+				jsonPhoto.put("photoFour",data.getPhotoFour());
+				//jsonPhotoListArray.add(jsonPhoto);
+				
+				//다이어리 알림 JSON에 넣기
+				JSONObject jsonNotify = new JSONObject();
+				jsonNotify.put("notifyID",data.getNotifyID());
+				jsonNotify.put("notifyDate",data.getNotifyDate());
+				jsonNotify.put("notifyTime",data.getNotifyTime());
+				//jsonNotifyListArray.add(jsonNotify);
+			
+				jsonData.put("photoList",jsonPhoto); //다이어리 배열 넣기
+				jsonData.put("notify",jsonNotify);// 전체 데이터 길이 넣기
+				json.put("data",jsonData); //총 data 값 넣어주기
+				
+				out.println(json.toString()); //테스트				
+				}
+			}catch(NumberFormatException e){
+				System.out.println("상세 일기 정보 조회 오류");
+			}catch(Exception e){
+				e.printStackTrace();
+			}
+	}
+%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="EUC-KR">
+<title>상세 일기 정보</title>
+</head>
+<body>
+Hello
+</body>
+</html>

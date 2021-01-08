@@ -1,0 +1,42 @@
+package Common;
+
+import java.io.File;
+
+public class FileMake {
+	//이미지 저장할 폴더 생성
+	public static void FileCheck(String path) {
+		File Folder = new File(path);
+		// 해당 디렉토리가 없을경우 디렉토리를 생성합니다.
+		
+		if (!Folder.exists()) {
+			try{
+			    Folder.mkdir(); //폴더 생성합니다.
+			    System.out.println("폴더가 생성되었습니다.");
+		    } 
+		    catch(Exception e){
+			    e.getStackTrace();
+			}         
+	    }   
+		else {
+			System.out.println("이미 폴더가 생성되어 있습니다.");
+        }
+		
+	}
+	
+	public static String RenameMoveFile(File A, File B) {
+			if(A.exists()){
+   				//만약 기존에 파일이 있다면 삭제한다.
+   				if(B.exists()){
+   					B.delete();
+   				}
+   				//파일을 이동한다.
+   				A.renameTo(B);	
+   			}
+			String imageDBPath = CommonData.getImageURL()+B.getName();
+			
+			System.out.println("서버에 저장될 사진 주소: "+B.getAbsolutePath());
+			System.out.println("DB에 저장될 사진 주소: "+imageDBPath);
+			
+			return imageDBPath;
+	}
+}

@@ -1,0 +1,91 @@
+package Common;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+
+import Calendar.DiaryDTO;
+
+public class JDataParser {
+	//일기 작성시 json 파싱
+	public static DiaryDTO Request_Calendar_003(String data) {
+		
+		JSONParser jsonParser = new JSONParser();
+		JSONObject jsonObject;
+		DiaryDTO dto = new DiaryDTO();
+		
+		try {
+			jsonObject = (JSONObject) jsonParser.parse(data);
+			
+			dto.setUserNO(Integer.parseInt(jsonObject.get("userNO").toString()));
+			dto.setDiaryDate(jsonObject.get("diaryDate").toString());
+			dto.setDiaryTitle(jsonObject.get("diaryTitle").toString());
+			dto.setDiaryContent(jsonObject.get("diaryContent").toString());
+			dto.setNotifyCheck(jsonObject.get("notifyCheck").toString());
+
+			JSONObject notifyJsonObject = (JSONObject) jsonObject.get("notify");
+			dto.setNotifySwitch(notifyJsonObject.get("notifySwitch").toString());
+			dto.setNotifyDate(notifyJsonObject.get("notifyDate").toString());
+			dto.setNotifyTime(notifyJsonObject.get("notifyTime").toString());
+			
+			int diaryNO = dto.getDiaryID();
+			String diaryDate = dto.getDiaryDate();
+			String diaryTitle = dto.getDiaryTitle();
+			String diaryContent = dto.getDiaryContent();
+			boolean notifyCheck = dto.isNotifyCheck();
+			boolean notifySwitch = dto.isNotifySwitch();
+			String notifyDate = dto.getNotifyDate();
+			String notifyTime = dto.getNotifyTime();
+			
+		} catch (ParseException e) {
+			e.printStackTrace();
+		} catch(Exception e) {
+			e.printStackTrace();
+		}
+		return dto;
+	}
+	
+	//일기 작성 서버 응답 json 값 
+	public static String Response_Calendar_003(int count) {
+		JSONObject json = new JSONObject();
+		//Calendar Three Diary Over Code;
+		if(count>=3) {
+			json.put("code", "20");
+			json.put("message", "Fail");
+		}else {
+		//SUCCESS CODE
+			json.put("code", "SY_2000");
+			json.put("message", "SUCCESS");
+		}
+		return json.toString();
+	}
+	
+	//일기 삭제시 json 파싱
+	public static DiaryDTO Request_Calendar_005(String json) {
+		
+		JSONParser jsonParser = new JSONParser();
+		JSONObject jsonObject;
+		DiaryDTO dto = new DiaryDTO();
+		
+		try {
+			jsonObject = (JSONObject) jsonParser.parse(json);
+			dto.setUserNO(Integer.parseInt(jsonObject.get("userNO").toString()));
+			dto.setDiaryDate(jsonObject.get("diaryDate").toString());
+			dto.setDiaryID(Integer.parseInt(jsonObject.get("diaryID").toString()));
+			
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	
+		return dto;
+	}
+	
+	//일기 삭제 서버 응답 json 값 
+	public static String Response_Calendar_005() {
+		JSONObject json = new JSONObject();
+		json.put("code", "SY_2000");
+		json.put("message", "SUCCESS");
+		return json.toString();
+	}
+}

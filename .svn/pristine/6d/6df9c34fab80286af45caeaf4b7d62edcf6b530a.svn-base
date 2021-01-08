@@ -1,0 +1,73 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="EUC-KR" import="Mypage.* , java.util.* , Common.*"%>
+
+
+<%
+request.setCharacterEncoding("UTF-8"); // Set Chracter 
+//GET 들어올 때
+if(request.getMethod().equals("GET")){
+   try{
+      System.out.println("회원 헤어 정보 조회 GET!!");
+      
+      System.out.println("서버 : " + request.getServerName());
+      System.out.println("포트번호 : " + request.getServerPort());
+      System.out.println("요청방식 : " + request.getMethod());
+      System.out.println("프로토콜 : " + request.getProtocol());
+      System.out.println("URL : " + request.getRequestURL());
+      System.out.println("URI : " + request.getRequestURI());
+      
+      int userNO = Integer.parseInt(request.getParameter("userNO"));
+
+      UserHairInformationDTO dto= new UserHairInformationDTO();
+      HairSettingDAO dao = new HairSettingDAO();
+      dto = dao.UserHairDB(userNO);
+      
+      String json =JDataParser.Response_MyPage_003(dto);
+      System.out.println(json);
+      out.println(json);
+      
+   }catch(Exception e){
+	   e.printStackTrace();
+   }
+   
+   
+}else if(request.getMethod().equals("POST")){
+    try{
+        System.out.println("회원 헤어 정보 업데이트 POST!!");
+        
+        System.out.println("서버 : " + request.getServerName());
+        System.out.println("포트번호 : " + request.getServerPort());
+        System.out.println("요청방식 : " + request.getMethod());
+        System.out.println("프로토콜 : " + request.getProtocol());
+        System.out.println("URL : " + request.getRequestURL());
+        System.out.println("URI : " + request.getRequestURI());
+        
+        String json = request.getParameter("json");
+        
+        UserHairInformationDTO dto= new UserHairInformationDTO();	
+        dto = JDataParser.Request_MyPage_002(json);
+        
+        HairSettingDAO dao = new HairSettingDAO();
+        String code = dao.UserHairUpdate(dto);
+        
+        String resultJson = JDataParser.Response_MyPage_002(code);
+        System.out.println(json);
+        out.println(resultJson);
+        
+     }catch(Exception e){
+  	   e.printStackTrace();
+     }
+     
+}
+%>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="EUC-KR">
+<title>회원 헤어 정보</title>
+</head>
+<body>
+
+</body>
+</html>

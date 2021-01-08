@@ -1,0 +1,26 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8" import="login.*, java.util.*"%>
+<%
+	request.setCharacterEncoding("UTF-8");
+String json = request.getParameter("json"); // 앱에서 JSON 파일 가져오기
+
+System.out.println("안드로이드에서 받은 파일" + json);
+
+SignUpDAO signup = new SignUpDAO(); // 객체 생성
+UserDTO user = signup.JsonParser(json); // JSON 파싱
+
+String returns = signup.InsertUser(user); // DB에 회원정보 저장
+int userNO = signup.SelectUserNO(user); // Email로 userNO 조회 및 저장
+String returns2 = signup.InsertUserPrivate(user, userNO); // userNO로 패스워드 저장
+signup.InsertUserHair(userNO); // userNO로 헤어특징 테이블에 기본값 INSERT해준다.
+
+System.out.println(returns + returns2);
+// 회원가입 성공했을 경우
+if (returns.equals("OK") & returns2.equals("OK")) {
+	out.print("SY_2000");
+	// 회원가입 실패했을 경우
+} else {
+	out.print("FAIL");
+}
+%>
+

@@ -1,0 +1,188 @@
+package Gallery;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import Common.CommonData;
+
+// DB에서 일기 데이터 , 검색 데이터를 조회하는 클래스. (갤러리용)
+public class GalleryDAO {
+	final private String jdbc_class = CommonData.getJdbc_Class();
+	final private String jdbc_url = CommonData.getJdbc_Url();
+	final private String DB_ID = CommonData.getDB_ID();
+	final private String DB_PW = CommonData.getDB_PW();
+
+	Connection conn;
+	PreparedStatement pstmt;
+	ResultSet rs = null;
+
+	// 데이터베이스 연결
+	public void Open() {
+		try {
+			Class.forName(jdbc_class);
+			conn = DriverManager.getConnection(jdbc_url, DB_ID, DB_PW);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	// 데이터베이스 연결 종료
+	public void Close() {
+		try {
+			pstmt.close();
+			conn.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// 앱에서 온 Json데이터를 파싱한다.
+	public GalleryDO JsonParser(String data) {
+		GalleryDO user = new GalleryDO();
+		int userNO = 0;
+		int pageNO = 0;
+		try {
+			JSONParser jsonParser = new JSONParser();
+			JSONObject jsonObject = (JSONObject) jsonParser.parse(data);
+
+			if (!"".equals(jsonObject.get("user_NO").toString())) {
+				// userNO 파싱
+				userNO = Integer.parseInt(jsonObject.get("user_NO").toString());
+				user.setUserNO(userNO);
+			}
+
+			if (!"".equals(jsonObject.get("user_profile").toString())) {
+				// PageNO 파싱.
+				pageNO = Integer.parseInt(jsonObject.get("user_profile").toString());
+				user.setPageNO(pageNO);
+			}
+
+			if (!"".equals(jsonObject.get("user_birthday").toString())) {
+				// 검색했을 시 검색한 날짜 파싱.
+				user.setGDate(jsonObject.get("user_birthday").toString());
+			}
+
+		} catch (Exception e) {
+		}
+		return user;
+	}
+
+	@SuppressWarnings("unchecked")
+	// 어플로 보낼 일기 데이터를 Json형식으로 변환한다.
+	public String MakeJson(List<GalleryDO> Glist) {
+		String result = null;
+		JSONArray array = new JSONArray();
+		HashMap<String, Object> myHashMap = new HashMap<String, Object>();
+		for (GalleryDO gdo : Glist) {
+			myHashMap.put("GPhoto", gdo.getGPhoto());
+			myHashMap.put("GTitle", gdo.getGTitle());
+			myHashMap.put("GDate", gdo.getGDate());
+			myHashMap.put("DiaryNO", gdo.getDiaryNO());
+			JSONObject object = new JSONObject(myHashMap); // head오브젝트와 body오브젝트를 담을 JSON오브젝트
+			array.add(object);
+		}
+		result = array.toString();
+
+		System.out.println("객체 만들었습니다." + result);
+		return result.toString();
+	}
+
+	// 앱에서 온 userNO 데이터로 DB에서 일기대표사진, 일기 제목, 일기 날짜를 가져온다.
+	public ArrayList<GalleryDO> SelectDiaryData(GalleryDO user) {
+		Open();
+		String sql = "SELECT diary_ID, diary_title, diary_DT FROM TBL_DIARY WHERE user_NO = ? ORDER BY diary_ID DESC LIMIT 10 OFFSET ?";
+		ArrayList<GalleryDO> datas = new ArrayList<>();
+		try {
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setInt(1, user.getUserNO());
+			pstmt.setInt(2, user.getPageNO() * 10);
+			rs = pstmt.executeQuery();
+
+			if (rs.next()) {
+				while (rs.next()) {
+					GalleryDO gd = new GalleryDO();
+					gd.setDiaryNO(rs.getInt("diary_ID"));
+					gd.setGDate(rs.getString("diary_DT"));
+					gd.setGTitle(rs.getString("diary_title"));
+					datas.add(gd);
+				}
+				rs.close();
+			} else {
+				System.out.println("해당 userNO에 해당하는 데이터가 없습니다. ( Default값 적용 ) ");
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			Close();
+		}
+		return datas;
+	}
+
+	// 일기 고유번호를 통해 해당 대표사진을 가져온다.
+	public List<GalleryDO> SelectPhoto(List<GalleryDO> Glist) {
+		Open();
+		String sql = "SELECT photo_one FROM TBL_PHOTO WHERE diary_ID= ?";
+		try {
+			pstmt = conn.prepareStatement(sql);
+			for (GalleryDO gd : Glist) {
+				pstmt.setInt(1, gd.getDiaryNO());
+				rs = pstmt.executeQuery();
+
+				if (rs.next()) {
+					gd.setGPhoto(rs.getString("photo_one"));
+				} else {
+					System.out.println(
+							"해당 일기에 사진이 저장되어 있지 않습니다. ( 정상적으로 프로그래밍이 돌아가면 사실 이런 경우는 없어야 함. 사진데이터가 없으면 일기를 저장할 수 없으므로 )");
+				}
+			}
+			rs.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			Close();
+		}
+		return Glist;
+	}
+
+	// 앱에서 온 userNO , 검색날짜 데이터로 DB에서 일기대표사진, 일기 제목 가져온다.
+	public ArrayList<GalleryDO> SelectSearchData(GalleryDO user) {
+		Open();
+		String sql = "SELECT diary_ID, diary_title FROM TBL_DIARY WHERE user_NO = ? AND diary_DT = ?";
+		ArrayList<GalleryDO> datas = new ArrayList<>();
+		try {
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setInt(1, user.getUserNO());
+			pstmt.setString(2, user.getGDate());
+			rs = pstmt.executeQuery();
+			if (rs.next()) {
+				while (rs.next()) {
+					GalleryDO gd = new GalleryDO();
+					gd.setDiaryNO(rs.getInt("diary_ID"));
+					gd.setGTitle(rs.getString("diary_title"));
+					gd.setGDate(user.getGDate());
+					datas.add(gd);
+				}
+				rs.close();
+			} else {
+				System.out.println("해당 날짜와 일치하는 데이터가 없습니다. ( Default값 적용 ) ");
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			Close();
+		}
+		return datas;
+	}
+
+}

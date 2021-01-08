@@ -1,0 +1,339 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="EUC-KR" import="Calendar.*, java.util.*"%>
+<%@ page import="org.json.simple.*" %>
+<%@ page import="java.io.*" %>
+<%@ page import="java.text.SimpleDateFormat" %>
+<%@page import="com.oreilly.servlet.multipart.DefaultFileRenamePolicy"%>
+<%@page import="com.oreilly.servlet.MultipartRequest"%>
+<%@ page import="Common.*" %>
+
+<%
+	request.setCharacterEncoding("UTF-8");
+
+	if(request.getMethod().equals("POST")){
+		System.out.println("Write Diary POST!!");
+
+		System.out.println("서버 : " + request.getServerName());
+		System.out.println("포트번호 : " + request.getServerPort());
+		System.out.println("요청방식 : " + request.getMethod());
+		System.out.println("프로토콜 : " + request.getProtocol());
+		System.out.println("URL : " + request.getRequestURL());
+		System.out.println("URI : " + request.getRequestURI());
+		
+		CalendarDAO dao = new CalendarDAO();
+		
+		//앱에서 서버로 이미지 전송시 임시 저장소 폴더
+		String uploadPath = request.getRealPath("upload"); 
+		//서버에서 실질적으로 저장될 이미지 데이터가 있는 폴더
+		String imageDataPath = request.getRealPath("hm_image_data"); 
+		
+		FileMake.FileCheck(imageDataPath);
+		
+		MultipartRequest multi = new MultipartRequest( // MultipartRequest 인스턴스 생성(cos.jar의 라이브러리)
+				request, 
+				uploadPath, // 파일을 저장할 디렉토리 지정
+				100 * 1024*1024, // 첨부파일 최대 용량 설정(bite) / 10KB / 용량 초과 시 예외 발생
+				"utf-8", // 인코딩 방식 지정
+				new DefaultFileRenamePolicy() // 중복 파일 처리(동일한 파일명이 업로드되면 뒤에 숫자 등을 붙여 중복 회피)
+		);
+		
+		String json = multi.getParameter("json");
+		System.out.println(json);
+	
+		DiaryDTO dto = new DiaryDTO();
+		dto = JDataParser.Request_Calendar_003(json);	
+		
+		dto = dao.WriteDiaryDB(dto); //다이어리 작성
+		//알림이 TRUE일 경우만 작성
+		if(dto.isNotifyCheck()){
+			dao.WriteNotifyDB(dto); 	
+		}
+		
+		//파일 생성
+		File file1 = multi.getFile("file1");
+		File file2 = multi.getFile("file2");
+		File file3 = multi.getFile("file3");
+		File file4 = multi.getFile("file4");
+		
+		List<File> files = new ArrayList<>();
+		if(file1!=null){
+			files.add(file1);
+		}if(file2!=null){
+			files.add(file2);
+		}if(file3!=null){
+			files.add(file3);
+		}if(file4!=null){
+			files.add(file4);
+		}
+		
+		boolean useFile= false; //파일 생성 되었는지 안되었는지 검사
+		if(files.size()!=0||files!=null){
+			useFile=true;
+			String filename = null;
+			File file = null;
+			File newFile = null;
+			String imageURL = null;
+			try{
+				for(int i=1; i<=files.size();i++){
+					switch(i){
+						case 1:
+							filename = multi.getFilesystemName("file1");
+							file = new File(uploadPath+"\\"+filename);
+							newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+							imageURL = FileMake.RenameMoveFile(file, newFile);
+							File filesize = multi.getFile("file1");
+							System.out.println("사진 크기 : " + filesize.length());
+							
+							dto.setPhotoOne(imageURL);
+							System.out.println("절대주소 : "+dto.getPhotoOne());
+							break;
+						case 2:
+							filename = multi.getFilesystemName("file2");
+							file = new File(uploadPath+"\\"+filename);
+							newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+							imageURL = FileMake.RenameMoveFile(file, newFile);
+							
+							dto.setPhotoTwo(imageURL);
+							System.out.println("절대주소 : "+dto.getPhotoTwo());
+							break;
+						case 3:
+							filename = multi.getFilesystemName("file3");
+							file = new File(uploadPath+"\\"+filename);
+							newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+							imageURL = FileMake.RenameMoveFile(file, newFile);
+							
+							dto.setPhotoThree(imageURL);
+							System.out.println("절대주소 : "+dto.getPhotoThree());
+							break;
+						case 4:
+							filename = multi.getFilesystemName("file4");
+							file = new File(uploadPath+"\\"+filename);
+							newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+i+".jpg");
+							imageURL = FileMake.RenameMoveFile(file, newFile);
+							
+							dto.setPhotoFour(imageURL);
+							System.out.println("절대주소 : "+dto.getPhotoFour());
+							break;						
+					}
+				}	
+			}catch(Exception e){
+				e.printStackTrace();
+			}
+			dao.WritePhotoDB(dto);
+		}else{
+			System.out.println("사진이 없습니다.");
+		}
+		
+		out.println(JDataParser.Response_Calendar_003());
+	}
+		/*
+		//이미지1
+		if(file1!=null){
+			useFile=true;
+			String filename = multi.getFilesystemName("file1");
+			//파일 불러오기
+			File file = new File(uploadPath+"\\"+filename);
+			File newFile = new File(imageDataPath+"\\"+dto.getDiaryID()+"_"+"1.jpg");
+   			if(file.exists()){
+   				//만약 기존에 파일이 있다면 삭제한다.
+   				if(newFile.exists()){
+   					newFile.delete();
+   				}
+   				//파일을 이동한다.
+   				file.renameTo(newFile);	
+   			}
+   					
+			String original = multi.getOriginalFileName("file1");
+			String type = multi.getContentType("file1");
+			
+			System.out.println("서버에 저장된 사진 이름 : "+filename);
+			System.out.println("서버에서 바뀐 사진 이름 : "+file.getName());
+			System.out.println("사진 원래 이름 : "+original);
+			System.out.println("사진 타입: "+type);
+			
+			File originalFile = multi.getFile("file1");
+			if(file!=null){
+		         out.println("사진 크기 : " + originalFile.length());
+		      }     
+		}
+		//이미지2
+		if(file2!=null){
+			useFile=true;
+			
+			String filename = multi.getFilesystemName("file2");
+			String original = multi.getOriginalFileName("file2");
+			String type = multi.getContentType("file2");
+			
+			System.out.println("서버 저장될 사진 이름 : "+filename);
+			System.out.println("사진 원래 이름 : "+original);
+			System.out.println("사진 타입: "+type);
+			
+			File file = multi.getFile("file2");
+			
+			out.println("파라메터 이름 : " + "file2" +"<br>");
+			out.println("실제 파일 이름 : " + original +"<br>");
+			out.println("저장된 파일 이름 : " + filename +"<br>");
+			out.println("파일 타입 : " + type +"<br>");
+			if(file!=null){
+		         out.println("크기 : " + file.length());
+		         out.println("<br>");
+		      }     
+		}
+		//이미지3
+		if(file3!=null){
+			useFile=true;
+			
+			String filename = multi.getFilesystemName("file3");
+			String original = multi.getOriginalFileName("file3");
+			String type = multi.getContentType("file3");
+			
+			System.out.println("서버 저장될 사진 이름 : "+filename);
+			System.out.println("사진 원래 이름 : "+original);
+			System.out.println("사진 타입: "+type);
+			
+			File file = multi.getFile("file3");
+			
+			out.println("파라메터 이름 : " + "file3" +"<br>");
+			out.println("실제 파일 이름 : " + original +"<br>");
+			out.println("저장된 파일 이름 : " + filename +"<br>");
+			out.println("파일 타입 : " + type +"<br>");
+			if(file!=null){
+		         out.println("크기 : " + file.length());
+		         out.println("<br>");
+		      }     
+		}
+		//이미지4
+		if(file4!=null){
+			useFile=true;
+			
+			String filename = multi.getFilesystemName("file4");
+			String original = multi.getOriginalFileName("file4");
+			String type = multi.getContentType("file4");
+			
+			System.out.println("서버 저장될 사진 이름 : "+filename);
+			System.out.println("사진 원래 이름 : "+original);
+			System.out.println("사진 타입: "+type);
+			
+			File file = multi.getFile("file4");
+			
+			out.println("파라메터 이름 : " + "file4" +"<br>");
+			out.println("실제 파일 이름 : " + original +"<br>");
+			out.println("저장된 파일 이름 : " + filename +"<br>");
+			out.println("파일 타입 : " + type +"<br>");
+			if(file!=null){
+		         out.println("크기 : " + file.length());
+		         out.println("<br>");
+		      }     
+		}
+		*/
+	
+		  /* file[]로 보냈을 경우
+		   //전송한 파일 정보를 가져와 출력한다
+		   Enumeration files = multi.getFileNames();
+	
+		   //파일 정보가 있다면
+		   while(files.hasMoreElements()){
+		    //input 태그의 속성이 file인 태그의 name 속성값 :파라미터이름
+		      String name = (String)files.nextElement();
+		      System.out.println("사진 이름 : "+name);
+		   //서버에 저장된 파일 이름
+		      String filename = multi.getFilesystemName(name);
+		      System.out.println("서버 저장될 사진 이름 : "+filename);
+		   //전송전 원래의 파일 이름
+		      String original = multi.getOriginalFileName(name);
+		      System.out.println("사진 원래 이름 : "+original);
+		   //전송된 파일의 내용 타입
+		      String type = multi.getContentType(name);
+		      System.out.println("사진 타입: "+type);
+		   //전송된 파일 속성이 file인 태그의 name 속성값을 이용해 파일 객체 생성
+		      File file = multi.getFile(name);
+		  
+		      out.println("파라메터 이름 : " + name +"<br>");
+		      out.println("실제 파일 이름 : " + original +"<br>");
+		      out.println("저장된 파일 이름 : " + filename +"<br>");
+		      out.println("파일 타입 : " + type +"<br>");
+		     
+		      if(file!=null){
+		         out.println("크기 : " + file.length());
+		         out.println("<br>");
+		      }
+		   }
+		   
+		   out.println("성공?");
+		*/
+		   
+
+		/* 이미지 파일 1개 저장하기
+		String fileName = multi.getFilesystemName("image"); // 
+		String originalFileName = multi.getFilesystemName("image"); // 
+		
+		String filePath = uploadPath + "\\" + fileName;
+		File file = new File(filePath);
+		*/
+		
+		
+		/*
+		// MIMETYPE 설정
+		String mimeType = getServletContext().getMimeType(filePath);
+		if (mimeType == null)
+			mimeType = "application/octet-stream";
+		response.setContentType(mimeType);
+
+		// 다운로드 설정 및 한글 파일명 깨지는 것 방지
+		String encoding = new String(fileName.getBytes("utf-8"), "8859_1");
+		response.setHeader("Content-Disposition", "attachment; filename= " + encoding);
+		*/
+		
+		/* // @Body로 받았을 경우
+		String parameter = null;
+		StringBuilder stringBuilder = new StringBuilder();
+		BufferedReader bufferedReader = null;
+		try {
+			
+		    InputStream inputStream = request.getInputStream();
+		    if (inputStream != null) {
+		        bufferedReader = new BufferedReader(new InputStreamReader(inputStream,"UTF-8"));
+		        char[] charBuffer = new char[128];
+		        int bytesRead = -1;
+		        while ((bytesRead = bufferedReader.read(charBuffer)) > 0) {
+		            stringBuilder.append(charBuffer, 0, bytesRead);
+		        }
+		    }
+		} catch (IOException ex) {
+		    throw ex;
+		} finally {
+		    if (bufferedReader != null) {
+		        try {
+		            bufferedReader.close();
+		        } catch (IOException ex) {
+		            throw ex;
+		        }
+		    }
+		}
+		parameter = stringBuilder.toString();
+		System.out.println("JSON : "+parameter);
+		*/
+/*
+		String diary= request.getParameter("diaryData");
+		String diaryTitle= request.getParameter("diaryTitle");
+		String diaryContent= request.getParameter("diaryContent");
+	
+		System.out.println("JSON : "+diary);
+		System.out.println("제목 : "+diaryTitle);
+		System.out.println("내용 : "+diaryContent);
+		
+		TestParser.dataParser(diary);
+		*/
+	
+%>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="EUC-KR">
+<title>일기 작성과 이미지 업로드</title>
+</head>
+<body>
+OKHTTP3
+</body>
+</html>

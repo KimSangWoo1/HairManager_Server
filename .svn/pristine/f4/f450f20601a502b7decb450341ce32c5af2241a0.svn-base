@@ -1,0 +1,21 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8" import="Gallery.*, java.util.*"%>
+
+<%
+	request.setCharacterEncoding("utf-8");
+String json = request.getParameter("json"); // 앱에서 JSON 파일 가져오기
+
+System.out.println("앱에서온 삭제 데이터 :" + json);
+
+GalleryDeleteDAO gdd = new GalleryDeleteDAO();
+List<String> diaryNOList = gdd.JsonParser(json);
+for (String a : diaryNOList) {
+	System.out.println(a);
+}
+
+if (diaryNOList.size() != 0) {
+	gdd.DeletetPhotoData(diaryNOList);
+	gdd.DeletetDiaryData(diaryNOList);
+	gdd.DeletetNotifyData(diaryNOList);
+}
+%>

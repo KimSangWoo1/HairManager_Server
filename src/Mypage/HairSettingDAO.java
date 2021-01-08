@@ -1,0 +1,121 @@
+package Mypage;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.SQLTransientConnectionException;
+
+import Common.CommonData;
+
+public class HairSettingDAO {
+
+	final private String jdbc_class = CommonData.getJdbc_Class();
+	final private String jdbc_url= CommonData.getJdbc_Url();
+	final private String DB_ID = CommonData.getDB_ID();
+	final private String DB_PW = CommonData.getDB_PW();
+	
+	Connection conn; 
+	PreparedStatement pstmt; 
+	
+	public void Open() {
+		try {
+			Class.forName(jdbc_class);
+			conn=DriverManager.getConnection(jdbc_url,DB_ID,DB_PW);
+			System.out.println("DB Connection Success");
+		}catch(Exception e) {
+			e.printStackTrace();
+		}				
+	}
+
+	public void Close() {
+		try {
+			pstmt.close();
+			conn.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}	
+	//유저 헤어 정보를 업데이트한다.
+	public String UserHairUpdate(UserHairInformationDTO dto) {
+		String code= "SY_2000";
+		Open();
+		String sql ="UPDATE TBL_HAIR SET thinninghair_code=?, hairquality_code=?, hairhead_code=?, haircolor=?  WHERE user_NO=?";
+		try {
+			pstmt = conn.prepareStatement(sql);
+			
+			int userNO = dto.getUserNO();
+			int thinning = dto.getThinning();
+			int quality = dto.getQuality();
+			int shape = dto.getShape();
+			String hairColor = dto.getHairColor();
+			//기본값 주기
+			if(hairColor==null||hairColor.trim().isEmpty()) {
+				hairColor="#000000";
+			}
+			pstmt.setInt(1, thinning);
+			pstmt.setInt(2, quality);
+			pstmt.setInt(3, shape);
+			pstmt.setString(4, hairColor);
+			pstmt.setInt(5, userNO);
+			pstmt.executeUpdate();	
+			
+		}catch (SQLTransientConnectionException e) {
+			e.printStackTrace();
+			code ="DB_0303";
+		}
+		catch (SQLSyntaxErrorException e) {
+			e.printStackTrace();
+			code ="DB_0303";
+		}catch (SQLException e) {
+			e.printStackTrace();
+			code ="DB_0303";
+		}catch (Exception e) {
+			e.printStackTrace();
+			code ="DB_0303";
+		}finally {
+			Close();
+		}		
+		return code;
+	}
+	//유저 헤어 정보를 조회한다.
+	public UserHairInformationDTO UserHairDB(int userNO) {
+	
+		Open();
+		String sql="SELECT * FROM TBL_HAIR  WHERE user_NO=?";
+		UserHairInformationDTO dto = new UserHairInformationDTO();
+		try {
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setInt(1, userNO);
+			ResultSet rs = pstmt.executeQuery();
+			rs.next();
+			int thinning = rs.getInt("thinninghair_code");
+			int quality = rs.getInt("hairquality_code");
+			int shape = rs.getInt("hairhead_code");
+			String hairColor = rs.getString("haircolor");
+			
+			dto.setThinning(thinning);
+			dto.setQuality(quality);
+			dto.setShape(shape);
+			dto.setHairColor(hairColor);
+			
+		}catch (SQLSyntaxErrorException e) {
+			dto = null;
+			e.printStackTrace();
+	
+		}catch (SQLException e) {
+			dto = null;
+			e.printStackTrace();
+		}catch (Exception e) {
+			dto = null;
+			e.printStackTrace();
+
+		}finally {
+			Close();
+		}
+		return dto;
+	}
+}

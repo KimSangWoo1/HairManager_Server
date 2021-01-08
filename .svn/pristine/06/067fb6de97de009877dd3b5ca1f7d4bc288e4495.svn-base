@@ -1,0 +1,59 @@
+package Common;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+
+import Calendar.DiaryDTO;
+
+public class JDataParser {
+	//테스트 용으로 만든 클래스 사용 안함
+	public static DiaryDTO Request_Calendar_003(String data) {
+		
+		JSONParser jsonParser = new JSONParser();
+		JSONObject jsonObject;
+		DiaryDTO dto = new DiaryDTO();
+		
+		try {
+			jsonObject = (JSONObject) jsonParser.parse(data);
+	
+		
+			//System.Text.UTF8Encoding enc = new System.Text.UTF8Encoding();
+			//byte[] b = enc.GetBytes(originalString);
+			
+			dto.setUserNO(Integer.parseInt(jsonObject.get("userNO").toString()));
+			dto.setDiaryDate(jsonObject.get("diaryDate").toString());
+			dto.setDiaryTitle(jsonObject.get("diaryTitle").toString());
+			dto.setDiaryContent(jsonObject.get("diaryContent").toString());
+			dto.setNotifyCheck(jsonObject.get("notifyCheck").toString());
+
+			JSONObject notifyJsonObject = (JSONObject) jsonObject.get("notify");
+			dto.setNotifySwitch(notifyJsonObject.get("notifySwitch").toString());
+			dto.setNotifyDate(notifyJsonObject.get("notifyDate").toString());
+			dto.setNotifyTime(notifyJsonObject.get("notifyTime").toString());
+			
+			
+			int diaryNO = dto.getDiaryID();
+			String diaryDate = dto.getDiaryDate();
+			String diaryTitle = dto.getDiaryTitle();
+			String diaryContent = dto.getDiaryContent();
+			boolean notifyCheck = dto.isNotifyCheck();
+			boolean notifySwitch = dto.isNotifySwitch();
+			String notifyDate = dto.getNotifyDate();
+			String notifyTime = dto.getNotifyTime();
+			
+		} catch (ParseException e) {
+			e.printStackTrace();
+		} catch(Exception e) {
+			e.printStackTrace();
+		}
+		return dto;
+	}
+	public static String Response_Calendar_003() {
+		JSONObject json = new JSONObject();
+		json.put("code", "SY_2000");
+		json.put("message", "SUCCESS");
+		return json.toString();
+	}
+}
